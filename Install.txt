@@ -1,0 +1,4 @@
+git init
+git remote add origin https://github.com/kurei87/DJProject.git
+git branch -M main
+git push -f -u origin main

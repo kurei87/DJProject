@@ -12,14 +12,16 @@ DEBUG = True #os.getenv('DEBUG', 'True') == 'True'
 
 # ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['*']
 
-# ALLOWED_HOSTS = [
-#     #'10.147.20.9',
-#     #'161.118.224.172',
-#     #'localhost',
-#     'support.alfa-net.uk',
-#     'support.dev.seambest.com.ph',]
+ALLOWED_HOSTS = [
+    '10.147.20.10',
+    '127.0.0.1',
+    #'161.118.224.172',
+    'localhost',
+    #'support.alfa-net.uk',
+    #'support.dev.seambest.com.ph',
+    ]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -124,5 +126,5 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000','http://10.147.20.10:3000').split(',')
 CORS_ALLOW_CREDENTIALS = True

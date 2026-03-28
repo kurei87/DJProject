@@ -1,0 +1,587 @@
+{% extends 'base.html' %}
+
+{% block title %}Events - Betting System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-calendar-event"></i> Betting Events</h2>
+    <div class="btn-group">
+        <button class="btn btn-outline-secondary active" data-filter="all">All</button>
+        <button class="btn btn-outline-secondary" data-filter="pending">Pending</button>
+        <button class="btn btn-outline-secondary" data-filter="open">Open</button>
+        <button class="btn btn-outline-secondary" data-filter="closed">Closed</button>
+        <button class="btn btn-outline-secondary" data-filter="settled">Settled</button>
+        <button class="btn btn-outline-secondary" data-filter="cancelled">Cancelled</button>
+        <button class="btn btn-outline-secondary" data-filter="archived">Archived</button>
+    </div>
+</div>
+
+<div class="row" id="eventsContainer">
+    <div class="col-12 text-center">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="betModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Place Bet</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6 id="betEventTitle"></h6>
+                <form id="betForm">
+                    <div class="mb-3">
+                        <label class="form-label">Select Outcome</label>
+                        <div id="outcomesContainer"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Stake Amount (₱)</label>
+                        <input type="number" class="form-control" id="stakeAmount" min="1" step="0.01" required>
+                    </div>
+                        <div class="mb-3">
+                            <label class="form-label">Potential Win (Dynamic Odds)</label>
+                            <div class="bet-potential-win h5 mb-0" id="potentialWin">₱0.00</div>
+                            <small class="text-muted">Odds update based on betting pool</small>
+                        </div>
+                    <div id="betError" class="alert alert-danger d-none"></div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-check-circle"></i> Place Bet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Event</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="statusEventTitle"></p>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" id="editDescription" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Select New Status</label>
+                    <select class="form-select" id="newStatus">
+                        <option value="pending">Pending</option>
+                        <option value="open">Open for Betting</option>
+                        <option value="closed">Closed</option>
+                        <option value="settled">Settled</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+                <div id="statusError" class="alert alert-danger d-none"></div>
+                <div id="statusSuccess" class="alert alert-success d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirmStatusChange">Update Event</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="settleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-trophy"></i> Settle Event</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="settleEventTitle"></p>
+                <div class="mb-3">
+                    <label class="form-label">Select Winner</label>
+                    <select class="form-select" id="winnerOutcome">
+                        <option value="">Loading outcomes...</option>
+                    </select>
+                </div>
+                <p class="text-muted small">This will mark all losing bets as lost and credit winners.</p>
+                <div id="settleError" class="alert alert-danger d-none"></div>
+                <div id="settleSuccess" class="alert alert-success d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmSettle">Settle Event</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="receiptModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content" id="receiptContent">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-check-circle-fill"></i> Bet Placed!</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="receipt-box">
+                    <h6 class="text-muted mb-3">BETTING SYSTEM</h6>
+                    <hr>
+                    <div class="text-start">
+                        <p class="mb-1"><strong>Bet ID:</strong> <span id="receiptBetId"></span></p>
+                        <p class="mb-1"><strong>Date:</strong> <span id="receiptDate"></span></p>
+                        <hr>
+                        <p class="mb-1"><strong>Event:</strong></p>
+                        <p class="mb-2" id="receiptEvent"></p>
+                        <p class="mb-1"><strong>Selection:</strong></p>
+                        <p class="mb-2" id="receiptSelection"></p>
+                        <p class="mb-1"><strong>Odds:</strong> <span id="receiptOdds"></span>x</p>
+                        <hr>
+                        <p class="mb-1"><strong>Stake:</strong> <span id="receiptStake"></span></p>
+                        <p class="mb-1"><strong>Potential Win:</strong> <span id="receiptWin"></span></p>
+                        <hr>
+                        <p class="text-muted small mb-0">Status: <span class="badge bg-warning" id="receiptStatus">PENDING</span></p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div id="qrCode" class="d-flex justify-content-center"></div>
+                    <p class="small text-muted mt-2">Scan to verify bet</p>
+                </div>
+                <button class="btn btn-primary w-100 mt-3" onclick="printReceipt()">
+                    <i class="bi bi-printer"></i> Print Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    body * { visibility: hidden; }
+    #receiptContent, #receiptContent * { visibility: visible; }
+    #receiptContent {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 300px;
+        border: 2px solid #000;
+        padding: 20px;
+    }
+    .modal-header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+.receipt-box {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px dashed #ccc;
+}
+.receipt-box hr {
+    border-top: 1px dashed #ccc;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedOutcome = null;
+let currentOdds = 0;
+let currentEventId = null;
+let currentMinBet = 1;
+let currentMaxBet = 10000;
+let currentOutcomes = [];
+let isAdmin = false;
+
+async function checkAdminStatus() {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    try {
+        const resp = await fetch('/api/users/profile/', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            isAdmin = data.is_staff || false;
+        }
+    } catch (e) {}
+}
+
+async function loadEvents(filter = 'all') {
+    await checkAdminStatus();
+    
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    const headers = { 'Authorization': `Bearer ${token}` };
+    const container = document.getElementById('eventsContainer');
+    
+    let url = '/api/events/?ordering=-start_time';
+    if (filter !== 'all') {
+        url = `/api/events/?status=${filter}&ordering=-start_time`;
+    }
+
+    try {
+        const response = await fetch(url, { headers });
+        const data = await response.json();
+        
+        if (data.results && data.results.length > 0) {
+            container.innerHTML = data.results.map(event => `
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card event-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="badge bg-secondary">${event.category_name || 'General'}</span>
+                                <span class="status-badge status-${event.status}">${event.status}</span>
+                            </div>
+                            <h5 class="card-title">${event.title}</h5>
+                            <p class="card-text text-muted small">${event.description.substring(0, 100)}...</p>
+                            <div class="d-flex justify-content-between mb-3">
+                                <small><i class="bi bi-calendar"></i> ${new Date(event.start_time).toLocaleDateString()}</small>
+                                <small>₱ ${parseFloat(event.min_bet).toFixed(0)} - ${parseFloat(event.max_bet).toFixed(0)}</small>
+                            </div>
+                            ${event.status === 'open' ? `
+                                <button class="btn btn-success w-100" onclick="openBetModal(${event.id}, '${event.title.replace(/'/g, "\\'")}', ${event.min_bet}, ${event.max_bet}, '${encodeURIComponent(JSON.stringify(event.outcomes))}')">
+                                    <i class="bi bi-bullseye"></i> Place Bet
+                                </button>
+                            ` : event.status === 'pending' ? `
+                                <button class="btn btn-warning w-100" disabled>
+                                    <i class="bi bi-clock"></i> Not Started
+                                </button>
+                            ` : `
+                                <button class="btn btn-secondary w-100" disabled>
+                                    ${event.status === 'settled' ? 'Event Ended' : 'Betting Closed'}
+                                </button>
+                            `}
+                            ${isAdmin ? `
+                            <hr>
+                            <div class="btn-group w-100">
+                                <button class="btn btn-outline-warning btn-sm" onclick="openStatusModal(${event.id}, '${event.title.replace(/'/g, "\\'")}', '${event.status}', '${(event.description || '').replace(/'/g, "\\'").replace(/\n/g, ' ')}')">
+                                    <i class="bi bi-pencil"></i> Status
+                                </button>
+                                ${event.status !== 'settled' && event.status !== 'cancelled' ? `
+                                    <button class="btn btn-outline-success btn-sm" onclick="openSettleModal(${event.id}, '${event.title.replace(/'/g, "\\'")}', '${encodeURIComponent(JSON.stringify(event.outcomes))}')">
+                                        <i class="bi bi-trophy"></i> Settle
+                                    </button>
+                                ` : ''}
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="col-12 text-center"><p class="text-muted">No events found</p></div>';
+        }
+    } catch (error) {
+        container.innerHTML = '<div class="col-12 text-center"><p class="text-danger">Error loading events</p></div>';
+    }
+}
+
+function openBetModal(eventId, title, minBet, maxBet, outcomesJson) {
+    currentEventId = eventId;
+    currentMinBet = parseFloat(minBet);
+    currentMaxBet = parseFloat(maxBet);
+    document.getElementById('betEventTitle').textContent = title;
+    document.getElementById('stakeAmount').min = currentMinBet;
+    document.getElementById('stakeAmount').max = currentMaxBet;
+    document.getElementById('stakeAmount').value = currentMinBet;
+    
+    const outcomes = JSON.parse(decodeURIComponent(outcomesJson));
+    currentOutcomes = outcomes;
+    const container = document.getElementById('outcomesContainer');
+    
+    const totalPool = outcomes.reduce((sum, o) => sum + (o.total_bets || 0), 0);
+    
+    container.innerHTML = outcomes.map(outcome => {
+        const outcomeBets = outcome.total_bets || 0;
+        const percentage = totalPool > 0 ? (outcomeBets / totalPool * 100) : 0;
+        const dynamicOdds = calculateDynamicOdds(totalPool, outcomeBets, outcome.odds);
+        return `
+        <div class="form-check mb-2 p-2 border rounded ${selectedOutcome === outcome.id ? 'bg-light' : ''}" id="outcome_row_${outcome.id}">
+            <input class="form-check-input" type="radio" name="outcome" 
+                   id="outcome_${outcome.id}" value="${outcome.id}" 
+                   data-odds="${outcome.odds}"
+                   data-dynamic-odds="${dynamicOdds}"
+                   data-pool-share="${percentage}"
+                   onclick="selectOutcome(${outcome.id}, ${outcome.odds}, ${dynamicOdds}, ${percentage})">
+            <label class="form-check-label w-100" for="outcome_${outcome.id}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><strong>${outcome.name}</strong></span>
+                    <span class="text-end">
+                        <span class="badge bg-primary">${dynamicOdds.toFixed(2)}x</span>
+                        ${outcomeBets > 0 ? `<span class="badge bg-secondary ms-1">${percentage.toFixed(1)}%</span>` : ''}
+                    </span>
+                </div>
+                <small class="text-muted">Pool: ₱${outcomeBets.toFixed(2)} | Base: ${outcome.odds}x</small>
+            </label>
+        </div>
+    `}).join('');
+
+    selectedOutcome = null;
+    currentOdds = 0;
+    updatePotentialWin();
+    
+    const modal = new bootstrap.Modal(document.getElementById('betModal'));
+    modal.show();
+}
+
+function calculateDynamicOdds(totalPool, outcomeBets, baseOdds) {
+    if (totalPool === 0 && outcomeBets === 0) return parseFloat(baseOdds);
+    const poolFee = 0.05;
+    const netPool = totalPool * (1 - poolFee);
+    if (outcomeBets === 0) return parseFloat(baseOdds);
+    return Math.max(1.01, netPool / outcomeBets);
+}
+
+function selectOutcome(id, baseOdds, dynamicOdds, poolShare) {
+    selectedOutcome = id;
+    currentOdds = dynamicOdds;
+    document.getElementById('potentialWin').innerHTML = `₱0.00 <small class="text-muted">(Dynamic)</small>`;
+    updatePotentialWin();
+}
+
+function updatePotentialWin() {
+    const stake = parseFloat(document.getElementById('stakeAmount').value) || 0;
+    const potentialWin = stake * currentOdds;
+    document.getElementById('potentialWin').innerHTML = `₱${potentialWin.toFixed(2)} <small class="text-muted">(Dynamic)</small>`;
+}
+
+function openStatusModal(eventId, title, currentStatus, description = '') {
+    currentEventId = eventId;
+    document.getElementById('statusEventTitle').textContent = `Event: ${title}`;
+    document.getElementById('editDescription').value = description || '';
+    document.getElementById('newStatus').value = currentStatus;
+    document.getElementById('statusError').classList.add('d-none');
+    document.getElementById('statusSuccess').classList.add('d-none');
+    
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+function openSettleModal(eventId, title, outcomesJson) {
+    currentEventId = eventId;
+    document.getElementById('settleEventTitle').textContent = `Event: ${decodeURIComponent(title)}`;
+    const outcomes = JSON.parse(decodeURIComponent(outcomesJson));
+    const select = document.getElementById('winnerOutcome');
+    
+    select.innerHTML = outcomes.map(outcome => `
+        <option value="${outcome.id}">${outcome.name} (${outcome.odds}x)</option>
+    `).join('');
+    
+    document.getElementById('settleError').classList.add('d-none');
+    document.getElementById('settleSuccess').classList.add('d-none');
+    
+    const modal = new bootstrap.Modal(document.getElementById('settleModal'));
+    modal.show();
+}
+
+function showReceipt(bet) {
+    console.log('Showing receipt for bet:', bet);
+    
+    try {
+        document.getElementById('receiptBetId').textContent = (bet.id || 'N/A').substring(0, 8).toUpperCase();
+        document.getElementById('receiptDate').textContent = new Date().toLocaleString();
+        document.getElementById('receiptEvent').textContent = bet.event_title || bet.event || 'N/A';
+        document.getElementById('receiptSelection').textContent = bet.outcome_name || 'N/A';
+        document.getElementById('receiptOdds').textContent = bet.outcome_odds || 'N/A';
+        document.getElementById('receiptStake').textContent = `₱${parseFloat(bet.stake || 0).toFixed(2)}`;
+        document.getElementById('receiptWin').textContent = `₱${parseFloat(bet.potential_win || 0).toFixed(2)}`;
+        
+        const qrData = JSON.stringify({
+            bet_id: bet.id,
+            event: bet.event_title,
+            selection: bet.outcome_name,
+            odds: parseFloat(bet.outcome_odds || 0),
+            stake: parseFloat(bet.stake || 0)
+        });
+        
+        const qrContainer = document.getElementById('qrCode');
+        qrContainer.innerHTML = '';
+        
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(qrContainer, {
+                text: qrData,
+                width: 120,
+                height: 120,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        } else {
+            qrContainer.innerHTML = '<div class="text-muted small">QR Code<br>Unavailable</div>';
+            qrContainer.style.cssText = 'width:120px;height:120px;display:flex;align-items:center;justify-content:center;border:1px dashed #ccc;margin:0 auto;';
+        }
+        
+        const modalEl = document.getElementById('receiptModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    } catch (err) {
+        console.error('Error showing receipt:', err);
+        alert('Bet placed! Check your bets page.');
+    }
+}
+
+function printReceipt() {
+    window.print();
+}
+
+document.getElementById('stakeAmount').addEventListener('input', updatePotentialWin);
+
+document.getElementById('betForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorDiv = document.getElementById('betError');
+    errorDiv.classList.add('d-none');
+    
+    if (!selectedOutcome) {
+        errorDiv.textContent = 'Please select an outcome';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    const stake = parseFloat(document.getElementById('stakeAmount').value);
+    
+    if (stake < currentMinBet) {
+        errorDiv.textContent = `Minimum bet is ₱${currentMinBet.toFixed(2)}`;
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    if (stake > currentMaxBet) {
+        errorDiv.textContent = `Maximum bet is ₱${currentMaxBet.toFixed(2)}`;
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    const token = localStorage.getItem('accessToken');
+    
+    try {
+        const response = await fetch('/api/bets/place/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                event_id: currentEventId,
+                outcome_id: selectedOutcome,
+                stake: stake
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('betModal')).hide();
+            console.log('Bet data:', data);
+            showReceipt(data.bet || data);
+            loadEvents();
+        } else {
+            errorDiv.textContent = data.error || data.detail || 'Failed to place bet';
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('d-none');
+    }
+});
+
+document.getElementById('confirmStatusChange').addEventListener('click', async () => {
+    const newStatus = document.getElementById('newStatus').value;
+    const errorDiv = document.getElementById('statusError');
+    const successDiv = document.getElementById('statusSuccess');
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+    
+    const token = localStorage.getItem('accessToken');
+    
+    try {
+        const response = await fetch(`/api/events/${currentEventId}/`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                status: newStatus,
+                description: document.getElementById('editDescription').value
+            })
+        });
+        
+        if (response.ok) {
+            successDiv.textContent = 'Event status updated successfully!';
+            successDiv.classList.remove('d-none');
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+                loadEvents();
+            }, 1500);
+        } else {
+            const data = await response.json();
+            errorDiv.textContent = JSON.stringify(data);
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('d-none');
+    }
+});
+
+document.getElementById('confirmSettle').addEventListener('click', async () => {
+    const winnerId = document.getElementById('winnerOutcome').value;
+    const errorDiv = document.getElementById('settleError');
+    const successDiv = document.getElementById('settleSuccess');
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+    
+    if (!winnerId) {
+        errorDiv.textContent = 'Please select a winner';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    const token = localStorage.getItem('accessToken');
+    
+    try {
+        const response = await fetch(`/api/bets/settle-event/${currentEventId}/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ winner_id: parseInt(winnerId) })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            successDiv.textContent = `Event settled! ${data.message}`;
+            successDiv.classList.remove('d-none');
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('settleModal')).hide();
+                loadEvents();
+            }, 2000);
+        } else {
+            const data = await response.json();
+            errorDiv.textContent = data.error || JSON.stringify(data);
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('d-none');
+    }
+});
+
+document.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadEvents(btn.dataset.filter);
+    });
+});
+
+checkAdminStatus().then(() => loadEvents());
+</script>
+{% endblock %}

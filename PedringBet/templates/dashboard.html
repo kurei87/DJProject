@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Betting System{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+
+<div id="adminPanel" class="mb-4" style="display: none;">
+    <div class="card bg-success text-white">
+        <div class="card-body">
+            <h5><i class="bi bi-shield-check"></i> Admin Panel</h5>
+            <a href="/events/create/" class="btn btn-light">
+                <i class="bi bi-plus-circle"></i> Create New Event
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Wallet Balance</h5>
+                <div class="wallet-balance" id="walletBalance">$0.00</div>
+                <a href="/wallet/" class="btn btn-outline-success mt-3">
+                    <i class="bi bi-wallet2"></i> Manage Wallet
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total Bets</h5>
+                <div class="stat-value" id="totalBets">0</div>
+                <a href="/bets/" class="btn btn-outline-success mt-3">
+                    <i class="bi bi-list-check"></i> View Bets
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Win Rate</h5>
+                <div class="stat-value" id="winRate">0%</div>
+                <a href="/bets/" class="btn btn-outline-success mt-3">
+                    <i class="bi bi-graph-up"></i> View Stats
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Upcoming Events</h5>
+            </div>
+            <div class="card-body">
+                <div id="upcomingEvents" class="list-group list-group-flush">
+                    <p class="text-muted text-center">Loading events...</p>
+                </div>
+                <a href="/events/" class="btn btn-success w-100 mt-3">
+                    <i class="bi bi-calendar-event"></i> View All Events
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> Recent Bets</h5>
+            </div>
+            <div class="card-body">
+                <div id="recentBets" class="list-group list-group-flush">
+                    <p class="text-muted text-center">Loading bets...</p>
+                </div>
+                <a href="/bets/" class="btn btn-success w-100 mt-3">
+                    <i class="bi bi-list-check"></i> View All Bets
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadDashboard() {
+    const token = localStorage.getItem('accessToken');
+    console.log('Token found:', !!token);
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    const headers = {
+        'Authorization': `Bearer ${token}`
+    };
+
+    try {
+        const [walletRes, statsRes, eventsRes, betsRes] = await Promise.all([
+            fetch('/api/wallets/', { headers }),
+            fetch('/api/bets/stats/', { headers }),
+            fetch('/api/events/?status=open&ordering=start_time', { headers }),
+            fetch('/api/bets/', { headers })
+        ]);
+
+        if (walletRes.ok) {
+            const walletData = await walletRes.json();
+            const balance = walletData.results?.[0]?.balance || '0.00';
+            document.getElementById('walletBalance').textContent = `₱${parseFloat(balance).toFixed(2)}`;
+        }
+
+        if (statsRes.ok) {
+            const stats = await statsRes.json();
+            document.getElementById('totalBets').textContent = stats.total_bets || 0;
+            document.getElementById('winRate').textContent = `${(stats.win_rate || 0).toFixed(1)}%`;
+        }
+
+        if (eventsRes.ok) {
+            const eventsData = await eventsRes.json();
+            const eventsContainer = document.getElementById('upcomingEvents');
+            if (eventsData.results && eventsData.results.length > 0) {
+                eventsContainer.innerHTML = eventsData.results.slice(0, 5).map(event => `
+                    <a href="/events/${event.id}/" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${event.title}</h6>
+                            <small>${new Date(event.start_time).toLocaleDateString()}</small>
+                        </div>
+                        <small class="text-muted">${event.category_name || 'General'}</small>
+                    </a>
+                `).join('');
+            } else {
+                eventsContainer.innerHTML = '<p class="text-muted text-center">No upcoming events</p>';
+            }
+        }
+
+        if (betsRes.ok) {
+            const betsData = await betsRes.json();
+            const betsContainer = document.getElementById('recentBets');
+            if (betsData.results && betsData.results.length > 0) {
+                betsContainer.innerHTML = betsData.results.slice(0, 5).map(bet => `
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${bet.event_title}</h6>
+                            <span class="badge bg-${bet.status === 'won' ? 'success' : bet.status === 'lost' ? 'danger' : 'warning'}">
+                                ${bet.status}
+                            </span>
+                        </div>
+                        <small>Stake: ₱${parseFloat(bet.stake).toFixed(2)} | ${bet.outcome_name} @ ${bet.outcome_odds}</small>
+                    </div>
+                `).join('');
+            } else {
+                betsContainer.innerHTML = '<p class="text-muted text-center">No bets placed yet</p>';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+}
+
+loadDashboard();
+
+async function checkAdmin() {
+    const token = localStorage.getItem('accessToken');
+    console.log('checkAdmin - Token:', !!token);
+    if (!token) return;
+    
+    try {
+        const resp = await fetch('/api/users/profile/', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        console.log('Profile response:', resp.status);
+        if (resp.ok) {
+            const data = await resp.json();
+            console.log('User is_staff:', data.is_staff);
+            if (data.is_staff) {
+                document.getElementById('adminPanel').style.display = 'block';
+            }
+        }
+    } catch (e) {
+        console.log('Check admin error:', e);
+    }
+}
+checkAdmin();
+</script>
+{% endblock %}

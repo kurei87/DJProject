@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+
+{% block title %}Open Events - PedringBet{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Todays Fight</h5>
+    </div>
+    <div class="card-body">
+        <div id="loadingIndicator" class="text-center text-muted">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            Loading events...
+        </div>
+        <div id="eventsContainer" class="row g-4"></div>
+        <div id="noEvents" class="text-center text-muted d-none">
+            <i class="bi bi-inbox" style="font-size: 48px;"></i>
+            <p class="mt-2">No open events available</p>
+        </div>
+    </div>
+</div>
+
+<style>
+.outcome-bar-container {
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    height: 32px;
+    position: relative;
+}
+.outcome-bar {
+    height: 100%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 13px;
+    font-weight: bold;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+}
+.outcome-bar.odds-low { background: linear-gradient(90deg, #28a745, #20c997); }
+.outcome-bar.odds-mid { background: linear-gradient(90deg, #17a2b8, #6610f2); }
+.outcome-bar.odds-high { background: linear-gradient(90deg, #ffc107, #fd7e14); }
+.dynamic-odds {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+.odds-favorable { color: #28a745; }
+.odds-risky { color: #dc3545; }
+.trophy-gold {
+    font-size: 2.5em;
+    color: #ffc107;
+    filter: drop-shadow(0 0 5px #ffc107);
+}
+.winner-alert {
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid #198754;
+    background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%);
+}
+.winner-alert .trophy-gold {
+    font-size: 2em;
+}
+.winner-alert h4 {
+    font-size: 1.2em;
+    margin: 8px 0;
+}
+.winner-alert .odds-badge {
+    font-size: 1em;
+    padding: 5px 12px;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadOpenEvents() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const eventsContainer = document.getElementById('eventsContainer');
+    const noEvents = document.getElementById('noEvents');
+    
+    loadingIndicator.classList.remove('d-none');
+    eventsContainer.innerHTML = '';
+    noEvents.classList.add('d-none');
+    
+    const token = localStorage.getItem('accessToken');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    try {
+        const response = await fetch('/api/events/?status__in=open,closed,settled', { headers });
+
+        if (response.ok) {
+            const data = await response.json();
+            const events = data.results || data;
+            loadingIndicator.classList.add('d-none');
+            renderEvents(events);
+        } else {
+            loadingIndicator.innerHTML = '<span class="text-danger">Failed to load events</span>';
+        }
+    } catch (error) {
+        console.error('Error loading events:', error);
+        loadingIndicator.innerHTML = '<span class="text-danger">Error loading events</span>';
+    }
+}
+
+function calculateDynamicOdds(totalPool, outcomeBets, baseOdds) {
+    if (totalPool === 0) return { dynamic: parseFloat(baseOdds), implied: 0 };
+    
+    const percentage = outcomeBets / totalPool;
+    const poolFee = 0.05;
+    const netPool = totalPool * (1 - poolFee);
+    const dynamicOdds = netPool / outcomeBets;
+    const impliedProbability = (1 / dynamicOdds) * 100;
+    
+    return {
+        dynamic: Math.max(1.01, dynamicOdds),
+        implied: impliedProbability
+    };
+}
+
+function renderEvents(events) {
+    document.getElementById('loadingIndicator').classList.add('d-none');
+    const container = document.getElementById('eventsContainer');
+
+    if (events.length === 0) {
+        document.getElementById('noEvents').classList.remove('d-none');
+        return;
+    }
+
+    container.innerHTML = events.map(event => {
+        const totalPool = event.outcomes.reduce((sum, o) => sum + o.total_bets, 0);
+        const isSettled = event.status === 'settled';
+        const isClosed = event.status === 'closed';
+        const isArchived = event.status === 'archived';
+        
+        const outcomesWithOdds = event.outcomes.map(outcome => {
+            const oddsData = calculateDynamicOdds(totalPool, outcome.total_bets, outcome.odds);
+            return {
+                ...outcome,
+                dynamicOdds: oddsData.dynamic,
+                impliedProbability: oddsData.implied
+            };
+        });
+
+        const minDynamicOdds = Math.min(...outcomesWithOdds.map(o => o.dynamicOdds));
+        const maxDynamicOdds = Math.max(...outcomesWithOdds.map(o => o.dynamicOdds));
+        
+        let statusBadge, headerBg;
+        if (isArchived) {
+            statusBadge = '<span class="badge bg-dark"><i class="bi bi-archive"></i> ARCHIVED</span>';
+            headerBg = 'bg-dark';
+        } else if (isSettled) {
+            statusBadge = '<span class="badge bg-success"><i class="bi bi-trophy"></i> SETTLED</span>';
+            headerBg = 'bg-success';
+        } else if (isClosed) {
+            statusBadge = '<span class="badge bg-secondary"><i class="bi bi-lock"></i> CLOSED</span>';
+            headerBg = 'bg-secondary';
+        } else {
+            statusBadge = '<span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> OPEN</span>';
+            headerBg = 'bg-primary';
+        }
+        
+        const winner = outcomesWithOdds.find(o => o.is_winner);
+        
+        let infoAlert = '';
+        if (isArchived) {
+            infoAlert = `<div class="alert alert-dark mb-3">
+                <i class="bi bi-archive"></i> This event has been archived.
+               </div>`;
+        } else if (isSettled && winner) {
+            infoAlert = `
+            <div class="winner-alert mb-3 text-center">
+                <i class="bi bi-trophy-fill trophy-gold"></i>
+                <h4 class="mt-2 mb-2"><strong>${winner.name}</strong></h4>
+                <p class="mb-2">WINS!</p>
+                <span class="badge bg-dark odds-badge">${winner.dynamicOdds.toFixed(2)}x Odds</span>
+            </div>`;
+        } else if (isClosed) {
+            infoAlert = `<div class="alert alert-secondary mb-3">
+                <i class="bi bi-lock"></i> Betting is closed. Waiting for settlement.
+               </div>`;
+        }
+
+        return `
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header ${headerBg} text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">${event.title}</h5>
+                            <small>${event.description || ''}</small>
+                        </div>
+                        <div class="text-end">
+                            ${statusBadge}
+                            <span class="badge bg-light text-dark ms-2">${event.category_name || 'Uncategorized'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    ${infoAlert}
+                    
+                    <div class="row mb-3 bg-light p-3 rounded">
+                        <div class="col-md-3 text-center border-end">
+                            <small class="text-muted">Total Pool</small>
+                            <h4 class="text-success mb-0">₱${totalPool.toFixed(2)}</h4>
+                        </div>
+                        <div class="col-md-3 text-center border-end">
+                            <small class="text-muted">Min / Max Bet</small>
+                            <h6 class="mb-0">₱${parseFloat(event.min_bet).toFixed(0)} / ₱${parseFloat(event.max_bet).toFixed(0)}</h6>
+                        </div>
+                        <div class="col-md-3 text-center border-end">
+                            <small class="text-muted">Odds Range</small>
+                            <h6 class="mb-0 text-danger">${minDynamicOdds.toFixed(2)}x - ${maxDynamicOdds.toFixed(2)}x</h6>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <small class="text-muted">Pool Fee</small>
+                            <h6 class="mb-0">${event.pool_fee}%</h6>
+                        </div>
+                    </div>
+                    
+                    <div class="outcome-bar-container mb-3">
+                        ${outcomesWithOdds.map(outcome => {
+                            const percentage = totalPool > 0 ? (outcome.total_bets / totalPool * 100) : 0;
+                            const isWinner = isSettled && outcome.is_winner;
+                            const oddsClass = isWinner ? 'bg-success' : (outcome.dynamicOdds < 2 ? 'odds-low' : (outcome.dynamicOdds < 4 ? 'odds-mid' : 'odds-high'));
+                            return `<div class="outcome-bar ${oddsClass}" style="width: ${percentage}%">${outcome.name}${isWinner ? ' ★' : ''}</div>`;
+                        }).join('')}
+                    </div>
+                    
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Outcome</th>
+                                <th class="text-center">Odds</th>
+                                <th class="text-center">Implied Prob</th>
+                                <th class="text-center">Total Bets</th>
+                                <th class="text-center">Bettors</th>
+                                <th class="text-center">Pool Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${outcomesWithOdds.map(outcome => {
+                                const percentage = totalPool > 0 ? (outcome.total_bets / totalPool * 100) : 0;
+                                const isWinner = isSettled && outcome.is_winner;
+                                const rowClass = isWinner ? 'table-success fw-bold' : '';
+                                const oddsClass = outcome.dynamicOdds < minDynamicOdds * 1.5 ? 'odds-favorable' : 'odds-risky';
+                                const winnerBadge = isWinner ? '<span class="badge bg-success ms-2"><i class="bi bi-trophy"></i> WINNER</span>' : '';
+                                return `
+                                <tr class="${rowClass}">
+                                    <td>
+                                        <strong>${outcome.name}</strong> ${winnerBadge}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="dynamic-odds ${oddsClass}">${outcome.dynamicOdds.toFixed(2)}x</span>
+                                        <br><small class="text-muted">Base: ${outcome.odds}x</small>
+                                    </td>
+                                    <td class="text-center">${outcome.impliedProbability.toFixed(1)}%</td>
+                                    <td class="text-center text-success fw-bold">₱${outcome.total_bets.toFixed(2)}</td>
+                                    <td class="text-center">${outcome.bet_count || 0}</td>
+                                    <td class="text-center">
+                                        <div class="progress mb-1" style="height: 20px;">
+                                            <div class="progress-bar ${isWinner ? 'bg-success' : 'bg-info'}" role="progressbar" style="width: ${percentage}%">
+                                                ${percentage.toFixed(1)}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    
+                    ${isArchived ? `
+                    <div class="alert alert-dark mb-0">
+                        <i class="bi bi-archive"></i> 
+                        This event has been archived and is no longer active.
+                    </div>
+                    ` : (isSettled ? `
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-check-circle"></i> 
+                        This event has been settled. The winning outcome is highlighted above.
+                    </div>
+                    ` : (isClosed ? `
+                    <div class="alert alert-secondary mb-0">
+                        <i class="bi bi-lock"></i> 
+                        This event is closed. Waiting for admin to settle and declare winner.
+                    </div>
+                    ` : `
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>How Dynamic Odds Work:</strong> Odds adjust based on betting activity. More bets on an outcome = lower odds. Less bets = higher odds.
+                        Pool fee of ${event.pool_fee}% is included in calculations.
+                    </div>
+                    `))}
+                </div>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+loadOpenEvents();
+
+setInterval(loadOpenEvents, 10000);
+</script>
+{% endblock %}

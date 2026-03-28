@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - Betting System{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-person-circle"></i> My Profile</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-person"></i> Account Information</h5>
+            </div>
+            <div class="card-body">
+                <div id="profileInfo">
+                    <div class="text-center">
+                        <div class="spinner-border text-success" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-key"></i> Change Password</h5>
+            </div>
+            <div class="card-body">
+                <form id="changePasswordForm">
+                    <div class="mb-3">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="oldPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="newPassword" required minlength="8">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirmPassword" required>
+                    </div>
+                    <div id="passwordError" class="alert alert-danger d-none"></div>
+                    <div id="passwordSuccess" class="alert alert-success d-none"></div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Change Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadProfile() {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    try {
+        const response = await fetch('/api/users/profile/', { headers });
+        const data = await response.json();
+        
+        document.getElementById('profileInfo').innerHTML = `
+            <table class="table">
+                <tr>
+                    <th>Username:</th>
+                    <td>${data.username}</td>
+                </tr>
+                <tr>
+                    <th>Email:</th>
+                    <td>${data.email}</td>
+                </tr>
+                <tr>
+                    <th>Date of Birth:</th>
+                    <td>${data.date_of_birth || 'Not set'}</td>
+                </tr>
+                <tr>
+                    <th>Verified:</th>
+                    <td>
+                        <span class="badge bg-${data.is_verified ? 'success' : 'warning'}">
+                            ${data.is_verified ? 'Verified' : 'Pending'}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Member Since:</th>
+                    <td>${new Date(data.created_at).toLocaleDateString()}</td>
+                </tr>
+            </table>
+        `;
+    } catch (error) {
+        document.getElementById('profileInfo').innerHTML = '<p class="text-danger">Error loading profile</p>';
+    }
+}
+
+document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorDiv = document.getElementById('passwordError');
+    const successDiv = document.getElementById('passwordSuccess');
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+    
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (newPassword !== confirmPassword) {
+        errorDiv.textContent = 'New passwords do not match';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    const token = localStorage.getItem('accessToken');
+    
+    try {
+        const response = await fetch('/api/users/change-password/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                old_password: document.getElementById('oldPassword').value,
+                new_password: newPassword
+            })
+        });
+        
+        if (response.ok) {
+            successDiv.textContent = 'Password changed successfully!';
+            successDiv.classList.remove('d-none');
+            document.getElementById('changePasswordForm').reset();
+        } else {
+            const data = await response.json();
+            errorDiv.textContent = Object.values(data).flat().join(', ') || 'Failed to change password';
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred';
+        errorDiv.classList.remove('d-none');
+    }
+});
+
+loadProfile();
+</script>
+{% endblock %}

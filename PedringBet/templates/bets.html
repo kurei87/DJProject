@@ -1,0 +1,589 @@
+{% extends 'base.html' %}
+
+{% block title %}My Bets - Betting System{% endblock %}
+
+{% block content %}
+<h2 class="mb-3"><i class="bi bi-list-check"></i> My Bets</h2>
+
+<div class="row g-2 mb-3 d-none">
+    <div class="col-6 col-md-2">
+        <div class="card stat-card">
+            <div class="card-body py-2">
+                <h6 class="card-title text-muted small mb-1">Total Bets</h6>
+                <div class="stat-value fs-5" id="statTotalBets">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="card stat-card">
+            <div class="card-body py-2">
+                <h6 class="card-title text-muted small mb-1">Won</h6>
+                <div class="stat-value text-success fs-5" id="statWon">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="card stat-card">
+            <div class="card-body py-2">
+                <h6 class="card-title text-muted small mb-1">Lost</h6>
+                <div class="stat-value text-danger fs-5" id="statLost">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card bg-warning text-dark">
+            <div class="card-body py-2">
+                <h6 class="card-title small mb-1">Unclaimed</h6>
+                <div class="stat-value fs-5" id="statUnclaimed">0</div>
+                <div class="small" id="unclaimedCount">0 bets</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body py-2">
+                <h6 class="card-title text-muted small mb-1">Profit</h6>
+                <div class="stat-value fs-5" id="statProfit">₱0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-card-list"></i> Betting History</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchBetId" placeholder="Search by Bet ID (e.g., 28DD337C)">
+                    <button class="btn btn-outline-secondary" onclick="searchByBetId()">Search</button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="btn-group w-100">
+                    <button class="btn btn-outline-secondary active" data-filter="all">All</button>
+                    <button class="btn btn-outline-secondary" data-filter="pending">Pending</button>
+                    <button class="btn btn-outline-secondary" data-filter="won">Won</button>
+                    <button class="btn btn-outline-secondary" data-filter="lost">Lost</button>
+                    <button class="btn btn-outline-warning" data-filter="unclaimed">Unclaimed</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Bet ID</th>
+                        <th>Date</th>
+                        <th>Event</th>
+                        <th>Selection</th>
+                        <th>Stake</th>
+                        <th>Odds</th>
+                        <th>Potential Win</th>
+                        <th>Actual Win</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="betsBody">
+                    <tr>
+                        <td colspan="10" class="text-center text-muted">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <div class="text-muted" id="paginationInfo">Showing 0 - 0 of 0</div>
+            <nav>
+                <ul class="pagination mb-0" id="paginationControls">
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="claimReceiptModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content" id="claimReceiptContent">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-gift-fill"></i> Winnings Claimed!</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="receipt-box">
+                    <h6 class="text-muted mb-3">BETTING SYSTEM</h6>
+                    <div class="text-center mb-3">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 48px;"></i>
+                    </div>
+                    <hr>
+                    <div class="text-start">
+                        <p class="mb-1"><strong>Claim ID:</strong> <span id="claimReceiptId"></span></p>
+                        <p class="mb-1"><strong>Date:</strong> <span id="claimReceiptDate"></span></p>
+                        <hr>
+                        <p class="mb-1"><strong>Bet ID:</strong> <span id="claimReceiptBetId"></span></p>
+                        <p class="mb-1"><strong>Event:</strong></p>
+                        <p class="mb-2" id="claimReceiptEvent"></p>
+                        <p class="mb-1"><strong>Selection:</strong></p>
+                        <p class="mb-2" id="claimReceiptSelection"></p>
+                        <p class="mb-1"><strong>Stake:</strong> <span id="claimReceiptStake"></span></p>
+                        <p class="mb-1"><strong>Odds:</strong> <span id="claimReceiptOdds"></span>x</p>
+                        <hr>
+                        <h4 class="text-success">AMOUNT CLAIMED</h4>
+                        <h2 class="text-success" id="claimReceiptAmount">₱0.00</h2>
+                        <p class="text-muted small">Added to your wallet</p>
+                    </div>
+                </div>
+                <button class="btn btn-primary w-100 mt-3" onclick="printClaimReceipt()">
+                    <i class="bi bi-printer"></i> Print Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.receipt-box {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px dashed #ccc;
+}
+.receipt-box hr {
+    border-top: 1px dashed #ccc;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allBets = [];
+let eventsPoolData = {};
+let currentFilter = 'all';
+let currentPage = 1;
+const betsPerPage = 10;
+
+async function loadBets(filter = 'all') {
+    currentFilter = filter;
+    currentPage = 1;
+    
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    try {
+        const [betsRes, statsRes, eventsRes] = await Promise.all([
+            fetch('/api/bets/', { headers }),
+            fetch('/api/bets/stats/', { headers }),
+            fetch('/api/events/', { headers })
+        ]);
+
+        if (betsRes.ok) {
+            const betsData = await betsRes.json();
+            allBets = betsData.results || [];
+        }
+
+        if (eventsRes.ok) {
+            const eventsData = await eventsRes.json();
+            const events = eventsData.results || eventsData;
+            events.forEach(event => {
+                eventsPoolData[event.id] = event.outcomes;
+            });
+        }
+
+        renderBets(filter);
+
+        if (statsRes.ok) {
+            const stats = await statsRes.json();
+            document.getElementById('statTotalBets').textContent = stats.total_bets || 0;
+            document.getElementById('statWon').textContent = stats.won_bets || 0;
+            document.getElementById('statLost').textContent = stats.lost_bets || 0;
+            document.getElementById('statUnclaimed').textContent = `₱${parseFloat(stats.unclaimed_amount || 0).toFixed(2)}`;
+            document.getElementById('unclaimedCount').textContent = `${stats.unclaimed_wins || 0} bets`;
+            const profit = parseFloat(stats.profit || 0);
+            document.getElementById('statProfit').textContent = `₱${profit.toFixed(2)}`;
+            document.getElementById('statProfit').className = `stat-value ${profit >= 0 ? 'text-success' : 'text-danger'}`;
+        }
+    } catch (error) {
+        console.error('Error loading bets:', error);
+    }
+}
+
+function calculateDynamicOdds(totalPool, outcomeBets) {
+    if (totalPool === 0 || outcomeBets === 0) return 2.00;
+    const poolFee = 0.05;
+    const netPool = totalPool * (1 - poolFee);
+    return Math.max(1.01, netPool / outcomeBets);
+}
+
+function getDynamicOddsInfo(eventId, outcomeId, baseOdds) {
+    const outcomes = eventsPoolData[eventId];
+    if (!outcomes) return { dynamicOdds: baseOdds, percentage: 0 };
+    
+    const totalPool = outcomes.reduce((sum, o) => sum + (o.total_bets || 0), 0);
+    const outcome = outcomes.find(o => o.id === outcomeId);
+    const outcomeBets = outcome ? (outcome.total_bets || 0) : 0;
+    const dynamicOdds = calculateDynamicOdds(totalPool, outcomeBets);
+    const percentage = totalPool > 0 ? (outcomeBets / totalPool * 100) : 0;
+    
+    return { dynamicOdds, percentage, totalPool };
+}
+
+function renderBets(filter) {
+    const tbody = document.getElementById('betsBody');
+    let filteredBets = allBets;
+    
+    if (filter === 'unclaimed') {
+        filteredBets = allBets.filter(bet => bet.status === 'won' && !bet.is_claimed);
+    } else if (filter !== 'all') {
+        filteredBets = allBets.filter(bet => bet.status === filter);
+    }
+    
+    const totalBets = filteredBets.length;
+    const totalPages = Math.ceil(totalBets / betsPerPage);
+    
+    if (currentPage > totalPages) currentPage = totalPages || 1;
+    
+    const startIndex = (currentPage - 1) * betsPerPage;
+    const endIndex = startIndex + betsPerPage;
+    const paginatedBets = filteredBets.slice(startIndex, endIndex);
+    
+    if (paginatedBets.length > 0) {
+        tbody.innerHTML = paginatedBets.map(bet => {
+            const isClaimable = bet.status === 'won' && !bet.is_claimed;
+            let statusBadge = '';
+            if (bet.status === 'won') {
+                statusBadge = bet.is_claimed 
+                    ? '<span class="badge bg-success">Won</span> <span class="badge bg-secondary">Claimed</span>'
+                    : '<span class="badge bg-success">Won</span> <span class="badge bg-warning text-dark">Unclaimed</span>';
+            } else {
+                statusBadge = `<span class="badge bg-${getStatusColor(bet.status)}">${bet.status}</span>`;
+            }
+            
+            const oddsInfo = getDynamicOddsInfo(bet.event_id, bet.outcome_id, bet.outcome_odds);
+            const isOddsIncreased = oddsInfo.dynamicOdds > bet.outcome_odds;
+            const isOddsDecreased = oddsInfo.dynamicOdds < bet.outcome_odds;
+            const oddsChangeClass = isOddsIncreased ? 'text-success' : (isOddsDecreased ? 'text-danger' : '');
+            const oddsArrow = isOddsIncreased ? '↑' : (isOddsDecreased ? '↓' : '');
+            
+            return `
+            <tr>
+                <td><code>${(bet.id || '').substring(0, 8).toUpperCase()}</code></td>
+                <td>${new Date(bet.placed_at).toLocaleDateString()}</td>
+                <td>${bet.event_title}</td>
+                <td>${bet.outcome_name}</td>
+                <td>₱${parseFloat(bet.stake).toFixed(2)}</td>
+                <td class="odds ${oddsChangeClass}">
+                    ${oddsInfo.dynamicOdds.toFixed(2)}x ${oddsArrow}
+                    <br><small class="text-muted">(${bet.outcome_odds}x orig)</small>
+                </td>
+                <td>
+                    ₱${parseFloat(bet.potential_win).toFixed(2)}
+                    ${oddsInfo.percentage > 0 ? `<br><small class="text-info">${oddsInfo.percentage.toFixed(1)}% pool</small>` : ''}
+                </td>
+                <td class="${bet.actual_win > 0 ? 'text-success fw-bold' : ''}">
+                    ${bet.actual_win !== null ? '₱' + parseFloat(bet.actual_win).toFixed(2) : '-'}
+                </td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${isClaimable ? `
+                        <button class="btn btn-success btn-sm" onclick="claimBet('${bet.id}')">
+                            <i class="bi bi-gift"></i> Claim
+                        </button>
+                    ` : (bet.status === 'won' && bet.is_claimed) ? `
+                        <span class="text-success"><i class="bi bi-check-circle"></i> Done</span>
+                    ` : '-'}
+                </td>
+            </tr>
+        `}).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No bets found</td></tr>';
+    }
+    
+    renderPagination(totalBets, totalPages);
+}
+
+function renderPagination(totalBets, totalPages) {
+    const paginationInfo = document.getElementById('paginationInfo');
+    const paginationControls = document.getElementById('paginationControls');
+    
+    const startIndex = (currentPage - 1) * betsPerPage + 1;
+    const endIndex = Math.min(currentPage * betsPerPage, totalBets);
+    
+    paginationInfo.textContent = totalBets > 0 
+        ? `Showing ${startIndex} - ${endIndex} of ${totalBets}`
+        : 'No bets found';
+    
+    let paginationHTML = '';
+    
+    if (totalPages > 1) {
+        paginationHTML += `
+            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage - 1})">&laquo;</a>
+            </li>
+        `;
+        
+        const maxVisible = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+        
+        if (endPage - startPage < maxVisible - 1) {
+            startPage = Math.max(1, endPage - maxVisible + 1);
+        }
+        
+        if (startPage > 1) {
+            paginationHTML += `<li class="page-item"><a class="page-link" href="#" onclick="goToPage(1)">1</a></li>`;
+            if (startPage > 2) paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            paginationHTML += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>
+                </li>
+            `;
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            paginationHTML += `<li class="page-item"><a class="page-link" href="#" onclick="goToPage(${totalPages})">${totalPages}</a></li>`;
+        }
+        
+        paginationHTML += `
+            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage + 1})">&raquo;</a>
+            </li>
+        `;
+    }
+    
+    paginationControls.innerHTML = paginationHTML;
+}
+
+function goToPage(page) {
+    const filterBtns = document.querySelectorAll('[data-filter]');
+    const totalPages = Math.ceil(allBets.filter(bet => {
+        if (currentFilter === 'unclaimed') return bet.status === 'won' && !bet.is_claimed;
+        if (currentFilter !== 'all') return bet.status === currentFilter;
+        return true;
+    }).length / betsPerPage);
+    
+    if (page < 1 || page > totalPages) return;
+    
+    currentPage = page;
+    renderBets(currentFilter);
+}
+
+function searchByBetId() {
+    const searchId = document.getElementById('searchBetId').value.trim().toUpperCase();
+    if (!searchId) {
+        renderBets('all');
+        return;
+    }
+    
+    const tbody = document.getElementById('betsBody');
+    const found = allBets.filter(bet => (bet.id || '').toUpperCase().includes(searchId));
+    
+    if (found.length > 0) {
+        tbody.innerHTML = found.map(bet => {
+            const isClaimable = bet.status === 'won' && !bet.is_claimed;
+            let statusBadge = '';
+            if (bet.status === 'won') {
+                statusBadge = bet.is_claimed 
+                    ? '<span class="badge bg-success">Won</span> <span class="badge bg-secondary">Claimed</span>'
+                    : '<span class="badge bg-success">Won</span> <span class="badge bg-warning text-dark">Unclaimed</span>';
+            } else {
+                statusBadge = `<span class="badge bg-${getStatusColor(bet.status)}">${bet.status}</span>`;
+            }
+            
+            const oddsInfo = getDynamicOddsInfo(bet.event_id, bet.outcome_id, bet.outcome_odds);
+            const isOddsIncreased = oddsInfo.dynamicOdds > bet.outcome_odds;
+            const isOddsDecreased = oddsInfo.dynamicOdds < bet.outcome_odds;
+            const oddsChangeClass = isOddsIncreased ? 'text-success' : (isOddsDecreased ? 'text-danger' : '');
+            const oddsArrow = isOddsIncreased ? '↑' : (isOddsDecreased ? '↓' : '');
+            
+            return `
+            <tr class="table-success">
+                <td><code>${(bet.id || '').substring(0, 8).toUpperCase()}</code></td>
+                <td>${new Date(bet.placed_at).toLocaleDateString()}</td>
+                <td>${bet.event_title}</td>
+                <td>${bet.outcome_name}</td>
+                <td>₱${parseFloat(bet.stake).toFixed(2)}</td>
+                <td class="odds ${oddsChangeClass}">
+                    ${oddsInfo.dynamicOdds.toFixed(2)}x ${oddsArrow}
+                    <br><small class="text-muted">(${bet.outcome_odds}x orig)</small>
+                </td>
+                <td>
+                    ₱${parseFloat(bet.potential_win).toFixed(2)}
+                    ${oddsInfo.percentage > 0 ? `<br><small class="text-info">${oddsInfo.percentage.toFixed(1)}% pool</small>` : ''}
+                </td>
+                <td class="${bet.actual_win > 0 ? 'text-success fw-bold' : ''}">
+                    ${bet.actual_win !== null ? '₱' + parseFloat(bet.actual_win).toFixed(2) : '-'}
+                </td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${isClaimable ? `
+                        <button class="btn btn-success btn-sm" onclick="claimBet('${bet.id}')">
+                            <i class="bi bi-gift"></i> Claim
+                        </button>
+                    ` : (bet.status === 'won' && bet.is_claimed) ? `
+                        <span class="text-success"><i class="bi bi-check-circle"></i> Done</span>
+                    ` : '-'}
+                </td>
+            </tr>
+        `}).join('');
+        
+        document.getElementById('paginationInfo').textContent = `Found ${found.length} bet(s)`;
+        document.getElementById('paginationControls').innerHTML = '';
+    } else {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger">No bet found with this ID</td></tr>';
+        document.getElementById('paginationInfo').textContent = 'No results';
+        document.getElementById('paginationControls').innerHTML = '';
+    }
+}
+
+async function claimAllWins() {
+    const unclaimed = allBets.filter(bet => bet.status === 'won' && !bet.is_claimed);
+    if (unclaimed.length === 0) {
+        alert('No unclaimed winnings to claim!');
+        return;
+    }
+    
+    if (!confirm(`Claim all ${unclaimed.length} unclaimed winnings?`)) return;
+    
+    const token = localStorage.getItem('accessToken');
+    let claimed = 0;
+    let failed = 0;
+    let totalAmount = 0;
+    let claimedBets = [];
+    
+    for (const bet of unclaimed) {
+        try {
+            const response = await fetch(`/api/bets/claim/${bet.id}/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                claimed++;
+                totalAmount += parseFloat(data.amount_claimed);
+                claimedBets.push({...bet, amount: data.amount_claimed});
+            } else {
+                failed++;
+            }
+        } catch (e) {
+            failed++;
+        }
+    }
+    
+    if (claimed > 0) {
+        showClaimAllReceipt(claimedBets, totalAmount);
+    }
+    loadBets();
+}
+
+function showClaimAllReceipt(claimedBets, totalAmount) {
+    const betList = claimedBets.map((b, i) => 
+        `<tr><td>${i+1}</td><td>${b.id.substring(0, 8).toUpperCase()}</td><td>${b.event_title}</td><td>₱${parseFloat(b.amount).toFixed(2)}</td></tr>`
+    ).join('');
+    
+    document.getElementById('claimReceiptId').textContent = 'CLM' + Date.now().toString().slice(-6);
+    document.getElementById('claimReceiptDate').textContent = new Date().toLocaleString();
+    document.getElementById('claimReceiptBetId').textContent = `${claimedBets.length} bets`;
+    document.getElementById('claimReceiptEvent').innerHTML = `<table class="table table-sm small mb-0"><thead><tr><th>#</th><th>Bet ID</th><th>Event</th><th>Amount</th></tr></thead><tbody>${betList}</tbody></table>`;
+    document.getElementById('claimReceiptSelection').textContent = '';
+    document.getElementById('claimReceiptStake').textContent = '';
+    document.getElementById('claimReceiptOdds').textContent = '';
+    document.getElementById('claimReceiptAmount').textContent = `₱${totalAmount.toFixed(2)}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('claimReceiptModal'));
+    modal.show();
+}
+
+async function claimBet(betId) {
+    if (!confirm('Claim your winnings?')) return;
+    
+    const token = localStorage.getItem('accessToken');
+    const bet = allBets.find(b => b.id === betId);
+    
+    try {
+        const response = await fetch(`/api/bets/claim/${betId}/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showClaimReceipt(data, bet);
+            loadBets();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to claim'));
+        }
+    } catch (error) {
+        alert('An error occurred');
+    }
+}
+
+function showClaimReceipt(data, bet) {
+    document.getElementById('claimReceiptId').textContent = 'CLM' + Date.now().toString().slice(-6);
+    document.getElementById('claimReceiptDate').textContent = new Date().toLocaleString();
+    document.getElementById('claimReceiptBetId').textContent = (bet?.id || '').substring(0, 8).toUpperCase();
+    document.getElementById('claimReceiptEvent').textContent = bet?.event_title || 'N/A';
+    document.getElementById('claimReceiptSelection').textContent = bet?.outcome_name || 'N/A';
+    document.getElementById('claimReceiptStake').textContent = `₱${parseFloat(bet?.stake || 0).toFixed(2)}`;
+    document.getElementById('claimReceiptOdds').textContent = bet?.outcome_odds || 'N/A';
+    document.getElementById('claimReceiptAmount').textContent = `₱${parseFloat(data.amount_claimed).toFixed(2)}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('claimReceiptModal'));
+    modal.show();
+}
+
+function printClaimReceipt() {
+    window.print();
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'pending': 'warning',
+        'won': 'success',
+        'lost': 'danger',
+        'refunded': 'info',
+        'cancelled': 'secondary'
+    };
+    return colors[status] || 'secondary';
+}
+
+document.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentPage = 1;
+        currentFilter = btn.dataset.filter;
+        renderBets(btn.dataset.filter);
+    });
+});
+
+document.getElementById('searchBetId').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        searchByBetId();
+    }
+});
+
+loadBets();
+</script>
+{% endblock %}

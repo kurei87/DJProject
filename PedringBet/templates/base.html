@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Betting System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                ₱ Pedring Online Betting
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item" id="navEvents" style="display:none;">
+                        <a class="nav-link" href="/events/">
+                            <i class="bi bi-calendar-event"></i> Events
+                        </a>
+                    </li>
+                    <li class="nav-item" id="navOpenEvents" style="display:none;">
+                        <a class="nav-link" href="/open-events/">
+                            <i class="bi bi-bar-chart"></i> Open Events
+                        </a>
+                    </li>
+                    <li class="nav-item" id="navDashboard" style="display:none;">
+                        <a class="nav-link" href="/dashboard/">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item" id="navWallet" style="display:none;">
+                        <a class="nav-link" href="/wallet/">
+                            <i class="bi bi-wallet2"></i> Wallet
+                        </a>
+                    </li>
+                    <li class="nav-item" id="navBets" style="display:none;">
+                        <a class="nav-link" href="/bets/">
+                            <i class="bi bi-list-check"></i> My Bets
+                        </a>
+                    </li>
+                    <li class="nav-item" id="navCreateEvent" style="display:none;">
+                        <a class="nav-link" href="/events/create/">
+                            <i class="bi bi-plus-circle"></i> Create Event
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown" id="navProfile" style="display:none;">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> <span id="userName">User</span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/profile/">Profile</a></li>
+                            <li id="navAdminPanel"><a class="dropdown-item" href="/admin/">Admin Panel</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout/" onclick="logout()">Logout</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item" id="navLogin">
+                        <a class="nav-link" href="/login/">
+                            <i class="bi bi-box-arrow-in-right"></i> Login
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-dark text-white py-3 mt-5">
+        <div class="container text-center">
+            <p class="mb-0">&copy; 2026 PEDRING Online Betting System. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    async function checkAuth() {
+        const token = localStorage.getItem('accessToken');
+        const loggedIn = !!token;
+        
+        document.getElementById('navLogin').style.display = loggedIn ? 'none' : 'block';
+        document.getElementById('navProfile').style.display = loggedIn ? 'block' : 'none';
+        document.getElementById('navEvents').style.display = loggedIn ? 'block' : 'none';
+        document.getElementById('navOpenEvents').style.display = loggedIn ? 'block' : 'none';
+        document.getElementById('navDashboard').style.display = loggedIn ? 'block' : 'none';
+        document.getElementById('navWallet').style.display = loggedIn ? 'block' : 'none';
+        document.getElementById('navBets').style.display = loggedIn ? 'block' : 'none';
+        document.getElementById('navCreateEvent').style.display = 'none';
+        document.getElementById('navAdminPanel').style.display = 'none';
+        
+        if (token) {
+            try {
+                const resp = await fetch('/api/users/profile/', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    document.getElementById('userName').textContent = data.username || 'User';
+                    if (data.is_staff) {
+                        document.getElementById('navCreateEvent').style.display = 'block';
+                        document.getElementById('navAdminPanel').style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.log('Auth check failed');
+            }
+        }
+    }
+    
+    function logout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/';
+    }
+    
+    checkAuth();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

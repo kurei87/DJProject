@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}Wallet - Betting System{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-wallet2"></i> My Wallet</h2>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Current Balance</h5>
+                <div class="wallet-balance" id="walletBalance">$0.00</div>
+                <hr>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#depositModal">
+                            <i class="bi bi-plus-circle"></i> Deposit
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#withdrawModal">
+                            <i class="bi bi-dash-circle"></i> Withdraw
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Transaction History</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Balance</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="depositModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Deposit Funds</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="depositForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Amount ($)</label>
+                        <input type="number" class="form-control" id="depositAmount" min="1" step="0.01" required>
+                    </div>
+                    <div id="depositError" class="alert alert-danger d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Deposit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="withdrawModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-dash-circle"></i> Withdraw Funds</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="withdrawForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Amount ($)</label>
+                        <input type="number" class="form-control" id="withdrawAmount" min="1" step="0.01" required>
+                    </div>
+                    <div id="withdrawError" class="alert alert-danger d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Withdraw</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadWallet() {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    try {
+        const response = await fetch('/api/wallets/', { headers });
+        const data = await response.json();
+        
+        if (data.results && data.results.length > 0) {
+            const wallet = data.results[0];
+            document.getElementById('walletBalance').textContent = `₱${parseFloat(wallet.balance).toFixed(2)}`;
+            
+            const tbody = document.getElementById('transactionsBody');
+            if (wallet.transactions && wallet.transactions.length > 0) {
+                tbody.innerHTML = wallet.transactions.map(tx => `
+                    <tr>
+                        <td>${new Date(tx.created_at).toLocaleString()}</td>
+                        <td><span class="badge bg-${tx.transaction_type === 'credit' || tx.transaction_type === 'win' ? 'success' : 'danger'}">${tx.transaction_type}</span></td>
+                        <td class="${tx.transaction_type === 'credit' || tx.transaction_type === 'win' ? 'text-success' : 'text-danger'}">
+                            ${tx.transaction_type === 'credit' || tx.transaction_type === 'win' ? '+' : '-'}₱${parseFloat(tx.amount).toFixed(2)}
+                        </td>
+                        <td>₱${parseFloat(tx.balance_after).toFixed(2)}</td>
+                        <td>${tx.description || '-'}</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No transactions yet</td></tr>';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading wallet:', error);
+    }
+}
+
+document.getElementById('depositForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const amount = document.getElementById('depositAmount').value;
+    const errorDiv = document.getElementById('depositError');
+    errorDiv.classList.add('d-none');
+    
+    const token = localStorage.getItem('accessToken');
+    
+    try {
+        const response = await fetch('/api/wallets/deposit/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ amount: parseFloat(amount) })
+        });
+        
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('depositModal')).hide();
+            loadWallet();
+            document.getElementById('depositAmount').value = '';
+        } else {
+            const data = await response.json();
+            errorDiv.textContent = data.error || 'Deposit failed';
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred';
+        errorDiv.classList.remove('d-none');
+    }
+});
+
+document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const amount = document.getElementById('withdrawAmount').value;
+    const errorDiv = document.getElementById('withdrawError');
+    errorDiv.classList.add('d-none');
+    
+    const token = localStorage.getItem('accessToken');
+    
+    try {
+        const response = await fetch('/api/wallets/withdraw/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ amount: parseFloat(amount) })
+        });
+        
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('withdrawModal')).hide();
+            loadWallet();
+            document.getElementById('withdrawAmount').value = '';
+        } else {
+            const data = await response.json();
+            errorDiv.textContent = data.error || 'Withdrawal failed';
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred';
+        errorDiv.classList.remove('d-none');
+    }
+});
+
+loadWallet();
+</script>
+{% endblock %}

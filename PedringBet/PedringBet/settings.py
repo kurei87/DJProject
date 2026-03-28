@@ -10,7 +10,16 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production-
 
 DEBUG = True #os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+ALLOWED_HOSTS = [*]
+
+# ALLOWED_HOSTS = [
+#     #'10.147.20.9',
+#     #'161.118.224.172',
+#     #'localhost',
+#     'support.alfa-net.uk',
+#     'support.dev.seambest.com.ph',]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
